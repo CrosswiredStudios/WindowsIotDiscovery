@@ -4,11 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
+using System.Reactive;
+using System.Reactive.Subjects;
 using System.Threading;
-using System.Threading.Tasks;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Networking.Sockets;
@@ -32,7 +31,9 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// Port to send to and listen for UDP packets from other devices
         /// </summary>
-        private string udpPort;
+        string udpPort;
+
+        Subject<Unit> whenDevicesChanged = new Subject<Unit>();
 
         /// <summary>
         /// A list of all the devices the Discovery System is aware of
@@ -58,18 +59,25 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
+        public IObservable<Unit> WhenDevicesChanged => whenDevicesChanged;
+
+        public DiscoveryServer(string udpPort)
+        {
+            Devices = new List<DiscoverableDevice>();
+            this.udpPort = udpPort;
+            socket = new DatagramSocket();
+        }
+
         /// <summary>
         /// Initialize the Discovery System
         /// </summary>
         /// <returns></returns>
-        public async void Initialize(string udpPort)
+        public async void Initialize()
         {
             Debug.WriteLine("Discovery System: Initializing");
 
             try
             {
-                this.udpPort = udpPort;
-
                 // Set the message received function
                 socket.MessageReceived += ReceiveDiscoveryResponse;
 
@@ -79,7 +87,7 @@ namespace WindowsIotDiscovery.Models
                 // Set a timer to discover new devices every minute
                 discoverSmartDevicesTimer = new Timer(SendDiscoveryRequest, null, 0, 60000);
 
-                Debug.WriteLine("Discovery System: Success");
+                Debug.WriteLine($"Discovery System: Initialized on port {udpPort}");
             }
             catch (Exception ex)
             {
@@ -107,36 +115,42 @@ namespace WindowsIotDiscovery.Models
                 {
                     string discoveryResponseString = await reader.ReadToEndAsync();
                     JObject jDiscoveryResponse = JObject.Parse(discoveryResponseString);
+                    Debug.WriteLine($"   >>> {discoveryResponseString}");
 
-                    // The device must broadcast a brand, model, and serial number
-                    if (jDiscoveryResponse["brand"] != null &&
-                       jDiscoveryResponse["model"] != null &&
-                       jDiscoveryResponse["serialNumber"] != null)
+                    // Ignore if this is a discovery request
+                    if (jDiscoveryResponse["command"] != null && jDiscoveryResponse.Value<string>("command") == "DISCOVER")
+                    {
+                        Debug.WriteLine("Discovery System: Ignoring discovery request");
+                        return;
+                    }
+
+                    // The device must broadcast a name and its device info
+                    if (jDiscoveryResponse["name"] != null &&
+                       jDiscoveryResponse["deviceInfo"] != null)
                     {
                         // Create a strongly typed model of this new device
-                        var newSmartDevice = new DiscoverableDevice();
-                        newSmartDevice.DeviceInfo = JsonConvert.SerializeObject(jDiscoveryResponse);
-                        newSmartDevice.IpAddress = args.RemoteAddress.DisplayName;
-                        newSmartDevice.SerialNumber = jDiscoveryResponse.Value<string>("serialNumber");
+                        var newDevice = new DiscoverableDevice();
+                        newDevice.DeviceInfo = jDiscoveryResponse.Value<JObject>("deviceInfo");
+                        newDevice.Name = jDiscoveryResponse.Value<string>("name");
+                        newDevice.IpAddress = args.RemoteAddress.DisplayName;
 
                         // Go through the existing devices
                         foreach (var device in Devices)
                         {
-                            // Convert the existing devices info to a JObject 
-                            JObject smartDeviceInfo = JObject.Parse(device.DeviceInfo);
-
-                            // If this brand and serial number exist in the system
-                            if (smartDeviceInfo.Value<string>("brand") == jDiscoveryResponse.Value<string>("brand") &&
-                               smartDeviceInfo.Value<string>("serialNumber") == jDiscoveryResponse.Value<string>("serialNumber"))
-                            {
+                            if(device.Name == newDevice.Name)
+                            { 
                                 // Silence the device to avoid repeat responses
-                                SilenceSmartDevice(newSmartDevice.IpAddress + jDiscoveryResponse.Value<string>("discoverySilenceUrl"));
+                                SilenceSmartDevice(newDevice.IpAddress + jDiscoveryResponse.Value<string>("silenceUrl"));
 
                                 // If the IP address has changed
-                                if (device.IpAddress != newSmartDevice.IpAddress)
+                                if (device.IpAddress != newDevice.IpAddress)
                                 {
                                     // Update the smart device in the database
-                                    device.IpAddress = newSmartDevice.IpAddress;
+                                    device.IpAddress = newDevice.IpAddress;
+
+                                    // Let everyone know
+                                    whenDevicesChanged.OnNext(Unit.Default);
+
                                     return;
                                 }
                                 else // If its a perfect match
@@ -148,12 +162,14 @@ namespace WindowsIotDiscovery.Models
                         }
 
                         // Silence the device to avoid repeat responses
-                        SilenceSmartDevice(newSmartDevice.IpAddress + jDiscoveryResponse.Value<string>("discoverySilenceUrl"));
+                        SilenceSmartDevice(newDevice.IpAddress + jDiscoveryResponse.Value<string>("silenceUrl"));
 
                         // Add it to the database
-                        Debug.WriteLine("Added: " + newSmartDevice.DeviceInfo);
-                        Devices.Add(newSmartDevice);
+                        Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
+                        Devices.Add(newDevice);
 
+                        // Let everyone know
+                        whenDevicesChanged.OnNext(Unit.Default);
                     }
                     else // If the response was not valid
                     {
@@ -174,7 +190,7 @@ namespace WindowsIotDiscovery.Models
         /// </summary>
         public async void SendDiscoveryRequest(object state = null)
         {
-            Debug.WriteLine("DiscoverSystemServer: Sending Discovery Request");
+            Debug.WriteLine("Discovery System: Sending Discovery Request");
             try
             {
                 // Get an output stream to all IPs on the given port
@@ -187,16 +203,7 @@ namespace WindowsIotDiscovery.Models
                         JArray jDevices = new JArray();
                         foreach (var device in Devices)
                         {
-                            // Convert the existing device info to a JObject 
-                            JObject smartDeviceInfo = JObject.Parse(device.DeviceInfo);
-
-                            JObject jDevice = new JObject();
-
-                            jDevice.Add("brand", smartDeviceInfo.Value<string>("brand"));
-                            jDevice.Add("ipAddress", device.IpAddress);
-                            jDevice.Add("model", smartDeviceInfo.Value<string>("model"));
-                            jDevice.Add("serialNumber", device.SerialNumber);
-                            jDevices.Add(jDevice);
+                            jDevices.Add(device);
                         }
 
                         // Create a discovery request message
@@ -205,7 +212,7 @@ namespace WindowsIotDiscovery.Models
                         // Convert the request to a JSON string
                         writer.WriteString(JsonConvert.SerializeObject(discoveryRequestMessage));
 
-                        Debug.WriteLine(JsonConvert.SerializeObject(discoveryRequestMessage));
+                        Debug.WriteLine($"   >>> {JsonConvert.SerializeObject(discoveryRequestMessage)}");
 
                         // Send
                         await writer.StoreAsync();
@@ -220,9 +227,13 @@ namespace WindowsIotDiscovery.Models
 
         private async void SilenceSmartDevice(string apiUrl)
         {
-            Debug.WriteLine("Silencing device: " + apiUrl);
-            HttpClient httpClient = new HttpClient();
-            HttpResponseMessage response = await httpClient.GetAsync("http://" + apiUrl);
+            Debug.WriteLine("Discovery System: Silencing device.");
+            Debug.WriteLine($"   >>> {apiUrl}");
+
+            using (var httpClient = new HttpClient())
+            {
+                var response = await httpClient.GetAsync("http://" + apiUrl);
+            }
         }
     }
 }
