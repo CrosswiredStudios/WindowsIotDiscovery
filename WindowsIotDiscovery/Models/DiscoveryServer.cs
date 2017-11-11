@@ -79,7 +79,7 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 // Set the message received function
-                socket.MessageReceived += ReceiveDiscoveryResponse;
+                socket.MessageReceived += ReceiveDiscoveryMessage;
 
                 // Start the server
                 await socket.BindServiceNameAsync(udpPort);
@@ -103,7 +103,7 @@ namespace WindowsIotDiscovery.Models
         /// <param name="args"></param>
         /// Sample Message {"IpAddress":"10.0.0.202","Product":"PotPiServer","Command":"DiscoveryRequest"}
         /// Sample Message {"IpAddress":"10.0.0.202","Product":"PotPiPowerBox","SerialNumber":"1234-abcd","TcpPort":"215"}
-        public async void ReceiveDiscoveryResponse(DatagramSocket ds, DatagramSocketMessageReceivedEventArgs args)
+        public async void ReceiveDiscoveryMessage(DatagramSocket ds, DatagramSocketMessageReceivedEventArgs args)
         {
             Debug.WriteLine("Discovery System: Received UDP packet");
 
@@ -114,68 +114,87 @@ namespace WindowsIotDiscovery.Models
                 using (var reader = new StreamReader(resultStream))
                 {
                     string discoveryResponseString = await reader.ReadToEndAsync();
-                    JObject jDiscoveryResponse = JObject.Parse(discoveryResponseString);
                     Debug.WriteLine($"   >>> {discoveryResponseString}");
+                    JObject jRequest = JObject.Parse(discoveryResponseString);
 
                     // Ignore if this is a discovery request
-                    if (jDiscoveryResponse["command"] != null && jDiscoveryResponse.Value<string>("command") == "DISCOVER")
+                    if (jRequest["command"] != null)
                     {
-                        Debug.WriteLine("Discovery System: Ignoring discovery request");
-                        return;
-                    }
-
-                    // The device must broadcast a name and its device info
-                    if (jDiscoveryResponse["name"] != null &&
-                       jDiscoveryResponse["deviceInfo"] != null)
-                    {
-                        // Create a strongly typed model of this new device
-                        var newDevice = new DiscoverableDevice();
-                        newDevice.DeviceInfo = jDiscoveryResponse.Value<JObject>("deviceInfo");
-                        newDevice.Name = jDiscoveryResponse.Value<string>("name");
-                        newDevice.IpAddress = args.RemoteAddress.DisplayName;
-
-                        // Go through the existing devices
-                        foreach (var device in Devices)
+                        switch (jRequest.Value<string>("command").ToLower())
                         {
-                            if(device.Name == newDevice.Name)
-                            { 
-                                // Silence the device to avoid repeat responses
-                                SilenceSmartDevice(newDevice.IpAddress + jDiscoveryResponse.Value<string>("silenceUrl"));
-
-                                // If the IP address has changed
-                                if (device.IpAddress != newDevice.IpAddress)
+                            case "discover":
+                                Debug.WriteLine("Discovery System: Ignoring discovery request");
+                                return;
+                            case "identify":
+                                // The device must broadcast a name and its device info
+                                if (jRequest["name"] != null &&
+                                   jRequest["deviceInfo"] != null)
                                 {
-                                    // Update the smart device in the database
-                                    device.IpAddress = newDevice.IpAddress;
+                                    // Create a strongly typed model of this new device
+                                    var newDevice = new DiscoverableDevice();
+                                    newDevice.DeviceInfo = jRequest.Value<JObject>("deviceInfo");
+                                    newDevice.Name = jRequest.Value<string>("name");
+                                    newDevice.IpAddress = args.RemoteAddress.DisplayName;
 
-                                    // Let everyone know
-                                    whenDevicesChanged.OnNext(Unit.Default);
+                                    // Go through the existing devices
+                                    foreach (var device in Devices)
+                                    {
+                                        if (device.Name == newDevice.Name)
+                                        {
+                                            // If the IP address has changed
+                                            if (device.IpAddress != newDevice.IpAddress)
+                                            {
+                                                // Update the smart device in the database
+                                                device.IpAddress = newDevice.IpAddress;
 
-                                    return;
+                                                return;
+                                            }
+                                            else // If its a perfect match
+                                            {
+                                                // Ignore the response
+                                                return;
+                                            }
+                                        }
+                                    }
+
+                                    // Add it to the database
+                                    Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
+                                    Devices.Add(newDevice);
                                 }
-                                else // If its a perfect match
+                                break;
+                            case "update":
+                                // The device must broadcast a name and its device info
+                                if (jRequest["name"] != null &&
+                                   jRequest["deviceInfo"] != null)
                                 {
-                                    // Ignore the response
-                                    return;
+                                    // Create a strongly typed model of this new device
+                                    var newDevice = new DiscoverableDevice();
+                                    newDevice.DeviceInfo = jRequest.Value<JObject>("deviceInfo");
+                                    newDevice.Name = jRequest.Value<string>("name");
+                                    newDevice.IpAddress = args.RemoteAddress.DisplayName;
+
+                                    // Go through the existing devices
+                                    foreach (var device in Devices)
+                                    {
+                                        // If we find a match
+                                        if (device.Name == newDevice.Name)
+                                        {
+                                            // Update the device info
+                                            device.DeviceInfo = newDevice.DeviceInfo;
+                                            // Update the Ip Address
+                                            device.IpAddress = newDevice.IpAddress;
+
+                                            // Bounce out!
+                                            return;
+                                        }
+                                    }
+
+                                    // If no matches were found, add this device
+                                    Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
+                                    Devices.Add(newDevice);
                                 }
-                            }
+                                break;
                         }
-
-                        // Silence the device to avoid repeat responses
-                        SilenceSmartDevice(newDevice.IpAddress + jDiscoveryResponse.Value<string>("silenceUrl"));
-
-                        // Add it to the database
-                        Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
-                        Devices.Add(newDevice);
-
-                        // Let everyone know
-                        whenDevicesChanged.OnNext(Unit.Default);
-                    }
-                    else // If the response was not valid
-                    {
-                        Debug.WriteLine("Discovery System: UDP packet not valid");
-                        // Ignore the packet
-                        return;
                     }
                 }
             }
@@ -203,7 +222,10 @@ namespace WindowsIotDiscovery.Models
                         JArray jDevices = new JArray();
                         foreach (var device in Devices)
                         {
-                            jDevices.Add(device);
+                            JObject jDevice = new JObject();
+                            jDevice.Add("deviceInfo", device.DeviceInfo);
+                            jDevice.Add("name", device.Name);
+                            jDevices.Add(jDevice);
                         }
 
                         // Create a discovery request message
@@ -227,12 +249,21 @@ namespace WindowsIotDiscovery.Models
 
         private async void SilenceSmartDevice(string apiUrl)
         {
+            if (string.IsNullOrEmpty(apiUrl)) return;
+
             Debug.WriteLine("Discovery System: Silencing device.");
             Debug.WriteLine($"   >>> {apiUrl}");
 
-            using (var httpClient = new HttpClient())
+            try
             {
-                var response = await httpClient.GetAsync("http://" + apiUrl);
+                using (var httpClient = new HttpClient())
+                {
+                    var response = await httpClient.GetAsync("http://" + apiUrl);
+                }
+            }
+            catch(Exception ex)
+            {
+                Debug.WriteLine("Discovery System: Silencing failed.");
             }
         }
     }
