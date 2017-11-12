@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace WindowsIotDiscovery.Models.Messages
 {
@@ -7,8 +8,11 @@ namespace WindowsIotDiscovery.Models.Messages
     /// </summary>
     public class DiscoveryUpdateMessage
     {
-        public string Command => "UPDATE";
+        [JsonProperty(PropertyName = "command")]
+        public string Command { get => "UPDATE"; }
+        [JsonProperty(PropertyName = "deviceInfo")]
         public JObject DeviceInfo { get; set; }
+        [JsonProperty(PropertyName = "name")]
         public string Name { get; set; }
 
         public DiscoveryUpdateMessage(string name, JObject deviceInfo)

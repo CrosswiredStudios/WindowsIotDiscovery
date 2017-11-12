@@ -161,6 +161,7 @@ namespace WindowsIotDiscovery.Models
                                     Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
                                     Devices.Add(newDevice);
                                 }
+                                whenDevicesChanged.OnNext(Unit.Default);
                                 break;
                             case "update":
                                 // The device must broadcast a name and its device info
@@ -193,6 +194,7 @@ namespace WindowsIotDiscovery.Models
                                     Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
                                     Devices.Add(newDevice);
                                 }
+                                whenDevicesChanged.OnNext(Unit.Default);
                                 break;
                         }
                     }

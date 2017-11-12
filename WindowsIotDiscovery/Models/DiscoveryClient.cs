@@ -2,9 +2,14 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reactive;
+using System.Reactive.Subjects;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Networking;
@@ -15,8 +20,10 @@ using WindowsIotDiscovery.Models.Messages;
 
 namespace WindowsIotDiscovery.Models
 {
-    public class DiscoveryClient
+    public class DiscoveryClient : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
         #region Properties
 
         /// <summary>
@@ -44,6 +51,10 @@ namespace WindowsIotDiscovery.Models
         /// </summary>
         string udpPort;
 
+        Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
+        Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
+        
+
         public JObject DeviceInfo
         {
             get => deviceInfo;
@@ -53,7 +64,7 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// A list of all the devices the Discovery System is aware of
         /// </summary>
-        public List<DiscoverableDevice> Devices { get; set; }
+        public ObservableCollection<DiscoverableDevice> Devices { get; set; }
 
         /// <summary>
         /// The IpAddress of the device
@@ -96,6 +107,9 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
+        public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
+        public IObservable<DiscoverableDevice> WhenDeviceUpdated => whenDeviceUpdated;
+
         #endregion
 
         #region Constructors
@@ -106,7 +120,7 @@ namespace WindowsIotDiscovery.Models
         public DiscoveryClient(string udpPort)
         {
             broadcasting = false;
-            Devices = new List<DiscoverableDevice>();
+            Devices = new ObservableCollection<DiscoverableDevice>();
             socket = new DatagramSocket();
             this.udpPort = udpPort;
         }
@@ -136,6 +150,46 @@ namespace WindowsIotDiscovery.Models
                     // Send
                     await writer.StoreAsync();
                 }
+            }
+        }
+
+        public async void Discover()
+        {
+            Debug.WriteLine("Discovery System: Sending Discovery Request");
+            try
+            {
+                // Get an output stream to all IPs on the given port
+                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
+                {
+                    // Get a data writing stream
+                    using (var writer = new DataWriter(stream))
+                    {
+                        // Include all known devices in the request to minimize traffic (smart devices can use this info to determine if they need to respond)
+                        JArray jDevices = new JArray();
+                        foreach (var device in Devices)
+                        {
+                            JObject jDevice = new JObject();
+                            jDevice.Add("deviceInfo", device.DeviceInfo);
+                            jDevice.Add("name", device.Name);
+                            jDevices.Add(jDevice);
+                        }
+
+                        // Create a discovery request message
+                        DiscoveryRequestMessage discoveryRequestMessage = new DiscoveryRequestMessage("DISCOVER", "Server", IpAddress, jDevices);
+
+                        // Convert the request to a JSON string
+                        writer.WriteString(JsonConvert.SerializeObject(discoveryRequestMessage));
+
+                        Debug.WriteLine($"   >>> {JsonConvert.SerializeObject(discoveryRequestMessage)}");
+
+                        // Send
+                        await writer.StoreAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Discovery System Server - Send Discovery Request Failed: " + ex.Message);
             }
         }
 
@@ -175,8 +229,7 @@ namespace WindowsIotDiscovery.Models
         /// <param name="eventArguments"></param>
         private async void ReceivedDiscoveryMessage(DatagramSocket socket, DatagramSocketMessageReceivedEventArgs args)
         {
-            Debug.WriteLine("Discovery System: Received UDP packet");
-
+            
             try
             {
                 // Get the data from the packet
@@ -186,7 +239,12 @@ namespace WindowsIotDiscovery.Models
                 {
                     // Load the raw data into a response object
                     var potentialRequestString = (await reader.ReadToEndAsync());
-                    Debug.WriteLine($"   >>> {potentialRequestString}");
+
+                    if (args.RemoteAddress.DisplayName != IpAddress)
+                    {
+                        Debug.WriteLine("Discovery System: Received UDP packet");
+                        Debug.WriteLine($"   >>> {potentialRequestString}");
+                    }
 
                     JObject jRequest = JObject.Parse(potentialRequestString);
                     
@@ -196,6 +254,14 @@ namespace WindowsIotDiscovery.Models
                         switch(jRequest.Value<string>("command").ToLower())
                         {
                             case "discover":
+
+                                // If we initiated this discovery request
+                                if(args.RemoteAddress.DisplayName == IpAddress)
+                                {
+                                    // Ignore it
+                                    return;
+                                }
+
                                 // If the requestor included a list of its known devices
                                 if (jRequest["knownDevices"] != null)
                                 {
@@ -247,6 +313,7 @@ namespace WindowsIotDiscovery.Models
                                     // Add it to the database
                                     Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
                                     Devices.Add(newDevice);
+                                    whenDeviceAdded.OnNext(newDevice);
                                 }
                                 break;
                             case "update":
@@ -270,7 +337,7 @@ namespace WindowsIotDiscovery.Models
                                             device.DeviceInfo = newDevice.DeviceInfo;
                                             // Update the Ip Address
                                             device.IpAddress = newDevice.IpAddress;
-
+                                            whenDeviceUpdated.OnNext(device);
                                             // Bounce out!
                                             return;
                                         }
@@ -279,14 +346,16 @@ namespace WindowsIotDiscovery.Models
                                     // If no matches were found, add this device
                                     Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
                                     Devices.Add(newDevice);
+                                    whenDeviceAdded.OnNext(newDevice);
                                 }
                                 break;
                         };
                     }
                 }
             }
-            catch
+            catch(Exception ex)
             {
+                Debug.WriteLine($"Discovery System: {ex}");
                 return;
             }
         }
