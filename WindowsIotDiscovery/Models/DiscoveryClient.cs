@@ -22,6 +22,8 @@ namespace WindowsIotDiscovery.Models
 {
     public class DiscoveryClient : INotifyPropertyChanged
     {
+        const bool debug = false;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         #region Properties
@@ -145,7 +147,8 @@ namespace WindowsIotDiscovery.Models
                     // Convert the request to a JSON string
                     writer.WriteString(discoveryUpdateString);
 
-                    Debug.WriteLine($"   >>> {discoveryUpdateString}");
+                    if(debug)
+                        Debug.WriteLine($"   >>> {discoveryUpdateString}");
 
                     // Send
                     await writer.StoreAsync();
@@ -155,7 +158,8 @@ namespace WindowsIotDiscovery.Models
 
         public async void Discover()
         {
-            Debug.WriteLine("Discovery System: Sending Discovery Request");
+            if (debug)
+                Debug.WriteLine("Discovery System: Sending Discovery Request");
             try
             {
                 // Get an output stream to all IPs on the given port
@@ -180,7 +184,8 @@ namespace WindowsIotDiscovery.Models
                         // Convert the request to a JSON string
                         writer.WriteString(JsonConvert.SerializeObject(discoveryRequestMessage));
 
-                        Debug.WriteLine($"   >>> {JsonConvert.SerializeObject(discoveryRequestMessage)}");
+                        if (debug)
+                            Debug.WriteLine($"   >>> {JsonConvert.SerializeObject(discoveryRequestMessage)}");
 
                         // Send
                         await writer.StoreAsync();
@@ -242,8 +247,11 @@ namespace WindowsIotDiscovery.Models
 
                     if (args.RemoteAddress.DisplayName != IpAddress)
                     {
-                        Debug.WriteLine("Discovery System: Received UDP packet");
-                        Debug.WriteLine($"   >>> {potentialRequestString}");
+                        if (debug)
+                        {
+                            Debug.WriteLine("Discovery System: Received UDP packet");
+                            Debug.WriteLine($"   >>> {potentialRequestString}");
+                        }
                     }
 
                     JObject jRequest = JObject.Parse(potentialRequestString);
@@ -311,7 +319,8 @@ namespace WindowsIotDiscovery.Models
                                     }
 
                                     // Add it to the database
-                                    Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
+                                    if (debug)
+                                        Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
                                     Devices.Add(newDevice);
                                     whenDeviceAdded.OnNext(newDevice);
                                 }
@@ -344,7 +353,8 @@ namespace WindowsIotDiscovery.Models
                                     }
 
                                     // If no matches were found, add this device
-                                    Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
+                                    if (debug)
+                                        Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
                                     Devices.Add(newDevice);
                                     whenDeviceAdded.OnNext(newDevice);
                                 }
@@ -384,7 +394,8 @@ namespace WindowsIotDiscovery.Models
                         // Convert the request to a JSON string
                         writer.WriteString(discoveryResponseString);
 
-                        Debug.WriteLine($"   >>> {discoveryResponseString}");
+                        if (debug)
+                            Debug.WriteLine($"   >>> {discoveryResponseString}");
 
                         // Send
                         await writer.StoreAsync();
@@ -404,7 +415,8 @@ namespace WindowsIotDiscovery.Models
         /// </summary>
         public void StopBroadcasting()
         {
-            Debug.WriteLine("Discovery System Client: Stopping Discovery Response broadcast");
+            if (debug)
+                Debug.WriteLine("Discovery System Client: Stopping Discovery Response broadcast");
             broadcasting = false;
         }
 
