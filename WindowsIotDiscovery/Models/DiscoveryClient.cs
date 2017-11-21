@@ -22,7 +22,7 @@ namespace WindowsIotDiscovery.Models
 {
     public class DiscoveryClient : INotifyPropertyChanged
     {
-        const bool debug = false;
+        const bool debug = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
