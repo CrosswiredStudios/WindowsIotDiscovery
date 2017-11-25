@@ -53,8 +53,9 @@ namespace WindowsIotDiscovery.Models
         /// </summary>
         string udpPort;
 
-        Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
-        Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
+        readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
+        readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
+        readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
         
 
         public JObject DeviceInfo
@@ -110,6 +111,7 @@ namespace WindowsIotDiscovery.Models
         }
 
         public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
+        public IObservable<JObject> WhenDataReceived => whenDataReceived;
         public IObservable<DiscoverableDevice> WhenDeviceUpdated => whenDeviceUpdated;
 
         #endregion
@@ -131,8 +133,11 @@ namespace WindowsIotDiscovery.Models
 
         #region Methods
 
-        public async void BroadcastUpdate()
+        public async void BroadcastUpdate(JObject currentDeviceInfo = null)
         {
+            // Update device info with passed in information
+            if (currentDeviceInfo != null) deviceInfo = currentDeviceInfo;
+
             // Get an output stream to all IPs on the given port
             using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
             {
@@ -218,6 +223,8 @@ namespace WindowsIotDiscovery.Models
                 // Setup a UDP socket listener
                 socket.MessageReceived += ReceivedDiscoveryMessage;
                 await socket.BindServiceNameAsync(this.udpPort);
+                SendDiscoveryResponseMessage();
+                Discover();
                 Debug.WriteLine("Discovery System: Success");
             }
             catch (Exception ex)
@@ -234,7 +241,6 @@ namespace WindowsIotDiscovery.Models
         /// <param name="eventArguments"></param>
         private async void ReceivedDiscoveryMessage(DatagramSocket socket, DatagramSocketMessageReceivedEventArgs args)
         {
-            
             try
             {
                 // Get the data from the packet
@@ -243,8 +249,9 @@ namespace WindowsIotDiscovery.Models
                 using (var reader = new StreamReader(resultStream))
                 {
                     // Load the raw data into a response object
-                    var potentialRequestString = (await reader.ReadToEndAsync());
+                    var potentialRequestString = await reader.ReadToEndAsync();
 
+                    // Ignore messages from yourself
                     if (args.RemoteAddress.DisplayName != IpAddress)
                     {
                         if (debug)
@@ -261,8 +268,17 @@ namespace WindowsIotDiscovery.Models
                     {
                         switch(jRequest.Value<string>("command").ToLower())
                         {
+                            case "data":
+                                // Get the intended recipients
+                                var intendedRecipients = jRequest.Value<string>("recipients").Split(',');
+                                // If I am in the list or it is for everyone
+                                if (intendedRecipients.Any(r=>r == "all" || r == name))
+                                {
+                                    // Fire off a data event with the data payload
+                                    whenDataReceived.OnNext(JObject.FromObject(jRequest["data"]));
+                                }
+                                break;
                             case "discover":
-
                                 // If we initiated this discovery request
                                 if(args.RemoteAddress.DisplayName == IpAddress)
                                 {
@@ -370,15 +386,40 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
-        /// <summary>
-        /// Start broadcasting discovery response messages
-        /// </summary>
-        public async void StartBroadcasting()
+        public async void SendDataMessage(DiscoveryDataMessage discoveryDataMessage)
         {
-            broadcasting = true;
-            int count = 0;
+            Debug.WriteLine($"DiscoveryClient: Sending data message.");
+            try
+            {
+                // Get an output stream to all IPs on the given port
+                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
+                {
+                    // Get a data writing stream
+                    using (var writer = new DataWriter(stream))
+                    {
+                        // Get the data message as a string
+                        var dataMessageString = JsonConvert.SerializeObject(discoveryDataMessage);
 
-            while (broadcasting)
+                        // Convert the request to a JSON string
+                        writer.WriteString(dataMessageString);
+
+                        if (debug)
+                            Debug.WriteLine($"   >>> {dataMessageString}");
+
+                        // Send
+                        await writer.StoreAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"DiscoveryClient: Could not send data message.");
+            }
+        }
+
+        async void SendDiscoveryResponseMessage()
+        {
+            try
             {
                 // Get an output stream to all IPs on the given port
                 using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
@@ -401,11 +442,28 @@ namespace WindowsIotDiscovery.Models
                         await writer.StoreAsync();
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"DiscoveryClient: Could not complete identification broadcast");
+            }
+        }
 
+        /// <summary>
+        /// Start broadcasting discovery response messages
+        /// </summary>
+        public async void StartBroadcasting()
+        {
+            broadcasting = true;
+            int count = 0;
+
+            while (broadcasting)
+            {
+                SendDiscoveryResponseMessage();
 
                 // Enforce maximum of 10 seconds of broadcasting
                 count++;
-                if (count == 10) broadcasting = false;
+                if (count == 5) broadcasting = false;
                 await Task.Delay(2000);
             }
         }
