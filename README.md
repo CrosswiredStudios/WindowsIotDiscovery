@@ -1,7 +1,7 @@
 # WindowsIotDiscovery
-###A simple discovery and communication system for IoT devices on a network.
+###A simple discovery and communication system for IoT devices on a network.###
 
-##Platform
+##Platform##
 
 This library is intended for use with any Universal Windows Platform (UWP) app that needs to communicate with other apps. I use it extensively in my personal Windows IoT apps running on Raspberry Pis.
 
