@@ -2,10 +2,13 @@
 ###A simple discovery and communication system for IoT devices on a network.
 
 ##Platform
+
 This library is intended for use with any Universal Windows Platform (UWP) app that needs to communicate with other apps. I use it extensively in my personal Windows IoT apps running on Raspberry Pis.
 
 ##How to Use
+
 ###Initiation
+
 The DiscoveryClient can be added to any app with just two lines:
 
     var discoveryClient = new DiscoveryClient("1234");
