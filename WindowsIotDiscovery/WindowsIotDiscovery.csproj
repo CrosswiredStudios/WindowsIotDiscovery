@@ -108,7 +108,6 @@
   <ItemGroup>
     <Compile Include="Models\DiscoverableDevice.cs" />
     <Compile Include="Models\DiscoveryClient.cs" />
-    <Compile Include="Models\DiscoveryServer.cs" />
     <Compile Include="Models\Messages\DiscoveryDataMessage.cs" />
     <Compile Include="Models\Messages\DiscoveryUpdateMessage.cs" />
     <Compile Include="Models\Messages\DiscoveryRequestMessage.cs" />
