@@ -1,5 +1,5 @@
 # WindowsIotDiscovery
-### A simple discovery and communication system for IoT devices on a network.###
+### A simple discovery and communication system for IoT devices on a network.
 
 ## Platform
 
@@ -15,6 +15,20 @@ The DiscoveryClient can be added to any app with just two lines:
     discoveryClient.Initialize("My Unique Name");
 
 The first line will create an instance of the client with the port to operate on. The second line sets the unique name of this device. Upon initiation, the device will send out an IDENTIFY packet and a DISCOVER packet to find all the other devices on the network.
+
+### Devices
+
+Once the client is initialized, you can access devices by their name using LINQ:
+
+    var iotDevice = discoveryClient.Devices.FirstOrDefault(device => device.Name == "iotDeviceName");
+    
+Once you have an object, you have access to the Name, IpAdress, and DeviceInfo - a JObject that has any information the device provided. 
+    
+    string iotDeviceIpAddress = iotDevice.IpAddress;
+    string iotDeviceName = iotDevice.Name;
+    JObject iotDeviceInfo = iotDevice.DeviceInfo;
+    
+    Debug.WriteLine($"{iotDevice.Name} at {iotDevice.IpAddress} has a state of {iotDevice.DeviceInfo.GetValue<string>("state")}");
 
 ### Discovery
 
@@ -52,3 +66,9 @@ Sometimes you will want to know when a device is added or when a device's state 
       });
   
 *ObserveOn(SynchronizationContext.Current) is used to ensure that the code runs on the UI thread.*
+*Dont forget to dispose of subscriptions when you're done ;)*
+
+### Upcoming Changes
+
+Make discovery more efficient.
+Add direct messaging over udp.
