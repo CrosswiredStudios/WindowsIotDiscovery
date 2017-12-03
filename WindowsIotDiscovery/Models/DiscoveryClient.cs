@@ -18,7 +18,7 @@ namespace WindowsIotDiscovery.Models
 {
     public class DiscoveryClient : INotifyPropertyChanged
     {
-        const bool debug = true;
+        const bool debug = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -180,7 +180,7 @@ namespace WindowsIotDiscovery.Models
                         }
 
                         // Create a discovery request message
-                        DiscoveryRequestMessage discoveryRequestMessage = new DiscoveryRequestMessage("DISCOVER", "Server", IpAddress, jDevices);
+                        DiscoveryRequestMessage discoveryRequestMessage = new DiscoveryRequestMessage("DISCOVER", name, IpAddress, jDevices);
 
                         // Convert the request to a JSON string
                         writer.WriteString(JsonConvert.SerializeObject(discoveryRequestMessage));
@@ -206,7 +206,7 @@ namespace WindowsIotDiscovery.Models
         /// <param name="deviceInfo">A JSON object containing all the relevant device info</param>
         public async void Initialize(string name)
         {
-            Debug.WriteLine("Discovery System: Initializing");
+            Debug.WriteLine($"Discovery System: Initializing {name}");
 
             try
             {
