@@ -53,7 +53,9 @@ namespace WindowsIotDiscovery.Models
         readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
         readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
         
-
+        /// <summary>
+        /// Holds the current state of the device
+        /// </summary>
         public JObject DeviceInfo
         {
             get => deviceInfo;
@@ -87,24 +89,12 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// Is the Discovery System broadcasting discovery response messages
         /// </summary>
-        public bool IsBroadcasting
-        {
-            get
-            {
-                return broadcasting;
-            }
-        }
+        public bool IsBroadcasting => broadcasting;
 
         /// <summary>
         /// Port the Discovery System will send and receive messages on
         /// </summary>
-        public string Port
-        {
-            get
-            {
-                return udpPort;
-            }
-        }
+        public string Port => udpPort;
 
         public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
         public IObservable<JObject> WhenDataReceived => whenDataReceived;
@@ -140,12 +130,13 @@ namespace WindowsIotDiscovery.Models
                 // Get a data writing stream
                 using (var writer = new DataWriter(stream))
                 {
-                    // Create a discovery response message
+                    // Create a discovery update message
                     var discoveryUpdate = new DiscoveryUpdateMessage(name, deviceInfo);
 
+                    // Convert to a JSON string
                     var discoveryUpdateString = JsonConvert.SerializeObject(discoveryUpdate);
 
-                    // Convert the request to a JSON string
+                    // Send it
                     writer.WriteString(discoveryUpdateString);
 
                     if(debug)
@@ -235,7 +226,7 @@ namespace WindowsIotDiscovery.Models
         /// </summary>
         /// <param name="socket"></param>
         /// <param name="eventArguments"></param>
-        private async void ReceivedDiscoveryMessage(DatagramSocket socket, DatagramSocketMessageReceivedEventArgs args)
+        async void ReceivedDiscoveryMessage(DatagramSocket socket, DatagramSocketMessageReceivedEventArgs args)
         {
             try
             {
@@ -255,6 +246,10 @@ namespace WindowsIotDiscovery.Models
                             Debug.WriteLine("Discovery System: Received UDP packet");
                             Debug.WriteLine($"   >>> {potentialRequestString}");
                         }
+                    }
+                    else
+                    {
+                        return;
                     }
 
                     JObject jRequest = JObject.Parse(potentialRequestString);
@@ -396,7 +391,7 @@ namespace WindowsIotDiscovery.Models
                         // Get the data message as a string
                         var dataMessageString = JsonConvert.SerializeObject(discoveryDataMessage);
 
-                        // Convert the request to a JSON string
+                        // Write the string to the stream
                         writer.WriteString(dataMessageString);
 
                         if (debug)
