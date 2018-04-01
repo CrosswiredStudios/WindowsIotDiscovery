@@ -106,6 +106,9 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Controls\KnownDeviceList.xaml.cs">
+      <DependentUpon>KnownDeviceList.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Models\DiscoverableDevice.cs" />
     <Compile Include="Models\DiscoveryClient.cs" />
     <Compile Include="Models\Messages\DiscoveryDataMessage.cs" />
@@ -125,6 +128,12 @@
     <PackageReference Include="System.Reactive">
       <Version>3.1.1</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="Controls\KnownDeviceList.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
