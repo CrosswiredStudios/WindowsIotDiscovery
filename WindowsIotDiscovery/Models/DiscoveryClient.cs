@@ -1,11 +1,17 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Restup.Webserver.Attributes;
+using Restup.Webserver.Http;
+using Restup.Webserver.Models.Contracts;
+using Restup.Webserver.Models.Schemas;
+using Restup.Webserver.Rest;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using Windows.Networking;
@@ -28,26 +34,23 @@ namespace WindowsIotDiscovery.Models
         /// Flag to indicate if the system is broadcasting discovery responses
         /// </summary>
         bool broadcasting;
-
         /// <summary>
         /// A JSON object that contains all the information about the device
         /// </summary>
-        JObject deviceInfo;
-
+        object deviceInfo;
         /// <summary>
         /// The name this device will register under
         /// </summary>
         string name;
-
         /// <summary>
         /// UDP Socket object
         /// </summary>
         DatagramSocket socket;
-
+        int tcpPort;
         /// <summary>
         /// Port to send and receive UDP messages on
         /// </summary>
-        string udpPort;
+        int udpPort;
 
         readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
         readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
@@ -56,7 +59,7 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// Holds the current state of the device
         /// </summary>
-        public JObject DeviceInfo
+        public object DeviceInfo
         {
             get => deviceInfo;
             set { deviceInfo = value; }
@@ -94,7 +97,7 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// Port the Discovery System will send and receive messages on
         /// </summary>
-        public string Port => udpPort;
+        public string Port => udpPort.ToString();
 
         public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
         public IObservable<JObject> WhenDataReceived => whenDataReceived;
@@ -107,11 +110,12 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// Create a Discovery System Client instance
         /// </summary>
-        public DiscoveryClient(string udpPort)
+        public DiscoveryClient(int tcpPort, int udpPort)
         {
             broadcasting = false;
             Devices = new ObservableCollection<DiscoverableDevice>();
             socket = new DatagramSocket();
+            this.tcpPort = tcpPort;
             this.udpPort = udpPort;
         }
 
@@ -125,13 +129,13 @@ namespace WindowsIotDiscovery.Models
             if (currentDeviceInfo != null) deviceInfo = currentDeviceInfo;
 
             // Get an output stream to all IPs on the given port
-            using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
+            using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort.ToString()))
             {
                 // Get a data writing stream
                 using (var writer = new DataWriter(stream))
                 {
                     // Create a discovery update message
-                    var discoveryUpdate = new DiscoveryUpdateMessage(name, deviceInfo);
+                    var discoveryUpdate = new DiscoveryUpdateMessage(name, JObject.FromObject(deviceInfo));
 
                     // Convert to a JSON string
                     var discoveryUpdateString = JsonConvert.SerializeObject(discoveryUpdate);
@@ -155,7 +159,7 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 // Get an output stream to all IPs on the given port
-                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
+                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort.ToString()))
                 {
                     // Get a data writing stream
                     using (var writer = new DataWriter(stream))
@@ -190,12 +194,32 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
+        public async Task<TResult> GetDeviceState<TResult>(DiscoverableDevice device)
+        {
+            using (var httpClient = new HttpClient())
+            {
+                var uri = new Uri($"http://{device.IpAddress}:{tcpPort}/windowsIotDiscovery/state");
+                var response = await httpClient.GetAsync(uri);
+                var responseStream = await response.Content.ReadAsStreamAsync();
+
+                using (var reader = new StreamReader(responseStream))
+                {
+                    using (var jsonReader = new JsonTextReader(reader))
+                    {
+                        return new JsonSerializer().Deserialize<TResult>(jsonReader);
+                    }
+                }
+                
+            }
+            
+        }
+
         /// <summary>
         /// Initiates the Discovery System Client. 
         /// </summary>
         /// <param name="udpPort">This is the port the system will listen for and broadcast udp packets</param>
         /// <param name="deviceInfo">A JSON object containing all the relevant device info</param>
-        public async void Initialize(string name)
+        public async void Initialize(string name, object deviceInfo)
         {
             Debug.WriteLine($"Discovery System: Initializing {name}");
 
@@ -205,20 +229,49 @@ namespace WindowsIotDiscovery.Models
                 this.name = name;
 
                 // Set initial variables
-                this.deviceInfo = new JObject();
+                this.deviceInfo = deviceInfo;
 
                 // Setup a UDP socket listener
                 socket.MessageReceived += ReceivedDiscoveryMessage;
-                await socket.BindServiceNameAsync(this.udpPort);
+                await socket.BindServiceNameAsync(udpPort.ToString());
                 SendDiscoveryResponseMessage();
                 Discover();
                 Debug.WriteLine("Discovery System: Success");
+
+                // Set up the rest API
+                InitializeRestApi(tcpPort);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("Discovery System: Failure");
                 Debug.WriteLine("Reason: " + ex.Message);
             }
+        }
+
+        public async void InitializeRestApi(int tcpPort)
+        {
+            Debug.WriteLine("Initializing Rest Api");
+
+            try
+            {
+                var restRouteHandler = new RestRouteHandler();
+                restRouteHandler.RegisterController<DiscoveryController>(DeviceInfo);
+
+                var configuration = new HttpServerConfiguration()
+                  .ListenOnPort(tcpPort)
+                  .RegisterRoute("windowsIotDiscovery", restRouteHandler)
+                  .EnableCors();
+
+                var httpServer = new HttpServer(configuration);
+                await httpServer.StartServerAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
+
+            Debug.WriteLine($"Initializing Rest Api Completed");
+            Debug.WriteLine($"http://{IpAddress}:{tcpPort}/windowsIotDiscovery");
         }
 
         /// <summary>
@@ -383,7 +436,7 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 // Get an output stream to all IPs on the given port
-                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
+                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort.ToString()))
                 {
                     // Get a data writing stream
                     using (var writer = new DataWriter(stream))
@@ -413,13 +466,13 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 // Get an output stream to all IPs on the given port
-                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort))
+                using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort.ToString()))
                 {
                     // Get a data writing stream
                     using (var writer = new DataWriter(stream))
                     {
                         // Create a discovery response message
-                        var discoveryResponse = new DiscoveryResponseMessage(name, deviceInfo, "");
+                        var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(deviceInfo), "");
 
                         var discoveryResponseString = JsonConvert.SerializeObject(discoveryResponse);
 
@@ -470,5 +523,34 @@ namespace WindowsIotDiscovery.Models
         }
 
         #endregion
+    }
+
+    [RestController(InstanceCreationType.Singleton)]
+    public class DiscoveryController
+    {
+        public object DeviceInfo;
+
+        public DiscoveryController() { }
+
+        public DiscoveryController(object param)
+        {
+            DeviceInfo = param;
+        }
+
+        [UriFormat("/state")]
+        public IGetResponse State()
+        {
+            try
+            {
+                return new GetResponse(
+                  GetResponse.ResponseStatus.OK,
+                  DeviceInfo);
+            }
+            catch (Exception ex)
+            {
+                return new GetResponse(
+                  GetResponse.ResponseStatus.NotFound, ex);
+            }
+        }
     }
 }
