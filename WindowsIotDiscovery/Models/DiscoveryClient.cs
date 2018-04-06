@@ -55,7 +55,8 @@ namespace WindowsIotDiscovery.Models
         readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
         readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
         readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
-        
+        readonly Subject<JObject> whenUpdateReceived = new Subject<JObject>();
+
         /// <summary>
         /// Holds the current state of the device
         /// </summary>
@@ -102,6 +103,7 @@ namespace WindowsIotDiscovery.Models
         public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
         public IObservable<JObject> WhenDataReceived => whenDataReceived;
         public IObservable<DiscoverableDevice> WhenDeviceUpdated => whenDeviceUpdated;
+        public IObservable<JObject> WhenUpdateReceived => whenUpdateReceived;
 
         #endregion
 
@@ -248,7 +250,7 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
-        public async void InitializeRestApi(int tcpPort)
+        async void InitializeRestApi(int tcpPort)
         {
             Debug.WriteLine("Initializing Rest Api");
 
@@ -551,6 +553,23 @@ namespace WindowsIotDiscovery.Models
                 return new GetResponse(
                   GetResponse.ResponseStatus.NotFound, ex);
             }
+        }
+
+        [UriFormat("/update")]
+        public IPostResponse Update([FromContent]JObject payload)
+        {
+            try
+            {
+                whenUpdateReceived.OnNext(payload);
+                return new PostResponse(
+                  PostResponse.ResponseStatus.Created);
+            }
+            catch (Exception ex)
+            {
+                return new PostResponse(
+                  PostResponse.ResponseStatus.Conflict, null, ex);
+            }
+            
         }
     }
 }
