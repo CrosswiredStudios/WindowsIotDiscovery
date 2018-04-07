@@ -560,7 +560,7 @@ namespace WindowsIotDiscovery.Models
         {
             try
             {
-                whenUpdateReceived.OnNext(payload);
+                //whenUpdateReceived.OnNext(payload);
                 return new PostResponse(
                   PostResponse.ResponseStatus.Created);
             }
