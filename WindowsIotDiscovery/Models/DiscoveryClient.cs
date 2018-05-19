@@ -53,6 +53,7 @@ namespace WindowsIotDiscovery.Models
         int udpPort;
 
         readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
+        readonly Subject<string> whenDirectMessage = new Subject<string>();
         readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
         readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
         readonly Subject<JObject> whenUpdateReceived = new Subject<JObject>();
@@ -95,6 +96,8 @@ namespace WindowsIotDiscovery.Models
         /// </summary>
         public bool IsBroadcasting => broadcasting;
 
+        public string Name => name;
+
         /// <summary>
         /// Port the Discovery System will send and receive messages on
         /// </summary>
@@ -103,6 +106,7 @@ namespace WindowsIotDiscovery.Models
         public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
         public IObservable<JObject> WhenDataReceived => whenDataReceived;
         public IObservable<DiscoverableDevice> WhenDeviceUpdated => whenDeviceUpdated;
+        public IObservable<string> WhenDirectMessage => whenDirectMessage;
         public IObservable<JObject> WhenUpdateReceived => whenUpdateReceived;
 
         #endregion
@@ -116,6 +120,7 @@ namespace WindowsIotDiscovery.Models
         {
             broadcasting = false;
             Devices = new ObservableCollection<DiscoverableDevice>();
+            name = string.Empty;
             socket = new DatagramSocket();
             this.tcpPort = tcpPort;
             this.udpPort = udpPort;
@@ -257,11 +262,11 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 var restRouteHandler = new RestRouteHandler();
-                restRouteHandler.RegisterController<DiscoveryController>(DeviceInfo);
+                restRouteHandler.RegisterController<DiscoveryController>(this);
 
                 var configuration = new HttpServerConfiguration()
                   .ListenOnPort(tcpPort)
-                  .RegisterRoute("windowsIotDiscovery", restRouteHandler)
+                  .RegisterRoute("discovery", restRouteHandler)
                   .EnableCors();
 
                 var httpServer = new HttpServer(configuration);
@@ -274,6 +279,11 @@ namespace WindowsIotDiscovery.Models
 
             Debug.WriteLine($"Initializing Rest Api Completed");
             Debug.WriteLine($"http://{IpAddress}:{tcpPort}/windowsIotDiscovery");
+        }
+
+        internal void OnDirectMessage(string message)
+        {
+            whenDirectMessage.OnNext(message);
         }
 
         /// <summary>
@@ -463,6 +473,23 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
+        public async void SendDirectMessage(string deviceName, string message)
+        {
+            try
+            {
+                var device = Devices.FirstOrDefault(d => d.Name == deviceName);
+                using (var httpClient = new HttpClient())
+                {
+                    var uri = $"http://{device.IpAddress}:{tcpPort}/discovery/directMessage/{message}";
+                    var response = await httpClient.GetAsync(uri);
+                };
+            }
+            catch(Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
+        }
+
         async void SendDiscoveryResponseMessage()
         {
             try
@@ -530,23 +557,37 @@ namespace WindowsIotDiscovery.Models
     [RestController(InstanceCreationType.Singleton)]
     public class DiscoveryController
     {
-        public object DeviceInfo;
-
-        public DiscoveryController() { }
+        public DiscoveryClient discoveryClient;
 
         public DiscoveryController(object param)
         {
-            DeviceInfo = param;
+            discoveryClient = param as DiscoveryClient;
+        }        
+
+        [UriFormat("/directMessage/{message}")]
+        public IGetResponse DirectMessage(string message)
+        {
+            try
+            {
+                discoveryClient.OnDirectMessage(message);
+                return new GetResponse(
+                  GetResponse.ResponseStatus.OK);
+            }
+            catch (Exception ex)
+            {
+                return new GetResponse(
+                  GetResponse.ResponseStatus.NotFound, ex);
+            }
         }
 
         [UriFormat("/state")]
-        public IGetResponse State()
+        public IGetResponse State(string test)
         {
             try
             {
                 return new GetResponse(
                   GetResponse.ResponseStatus.OK,
-                  DeviceInfo);
+                  test);
             }
             catch (Exception ex)
             {
