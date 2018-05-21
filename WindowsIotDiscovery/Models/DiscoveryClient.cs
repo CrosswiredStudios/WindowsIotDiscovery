@@ -262,7 +262,7 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 var restRouteHandler = new RestRouteHandler();
-                restRouteHandler.RegisterController<DiscoveryController>(this);
+                restRouteHandler.RegisterController<DiscoveryController>();
 
                 var configuration = new HttpServerConfiguration()
                   .ListenOnPort(tcpPort)
@@ -558,6 +558,10 @@ namespace WindowsIotDiscovery.Models
     public class DiscoveryController
     {
         public DiscoveryClient discoveryClient;
+
+        public DiscoveryController()
+        {
+        }
 
         public DiscoveryController(object param)
         {
