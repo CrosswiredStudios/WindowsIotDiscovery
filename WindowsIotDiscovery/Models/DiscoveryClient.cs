@@ -262,7 +262,7 @@ namespace WindowsIotDiscovery.Models
             try
             {
                 var restRouteHandler = new RestRouteHandler();
-                restRouteHandler.RegisterController<DiscoveryController>();
+                restRouteHandler.RegisterController<DiscoveryController>(this);
 
                 var configuration = new HttpServerConfiguration()
                   .ListenOnPort(tcpPort)
@@ -559,13 +559,9 @@ namespace WindowsIotDiscovery.Models
     {
         public DiscoveryClient discoveryClient;
 
-        public DiscoveryController()
+        public DiscoveryController(object discoveryClient)
         {
-        }
-
-        public DiscoveryController(object param)
-        {
-            discoveryClient = param as DiscoveryClient;
+            this.discoveryClient = discoveryClient as DiscoveryClient;
         }        
 
         [UriFormat("/directMessage/{message}")]
@@ -585,13 +581,13 @@ namespace WindowsIotDiscovery.Models
         }
 
         [UriFormat("/state")]
-        public IGetResponse State(string test)
+        public IGetResponse State()
         {
             try
             {
                 return new GetResponse(
                   GetResponse.ResponseStatus.OK,
-                  test);
+                  "");
             }
             catch (Exception ex)
             {
