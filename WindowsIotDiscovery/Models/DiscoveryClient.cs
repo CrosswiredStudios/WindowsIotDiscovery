@@ -26,7 +26,7 @@ namespace WindowsIotDiscovery.Models
 {
     public class DiscoveryClient : INotifyPropertyChanged
     {
-        const bool debug = false;
+        const bool debug = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -388,32 +388,32 @@ namespace WindowsIotDiscovery.Models
                                     newDevice.Name = jRequest.Value<string>("name");
                                     newDevice.IpAddress = args.RemoteAddress.DisplayName;
 
-                                    // Go through the existing devices
-                                    foreach (var device in Devices)
-                                    {
-                                        if (device.Name == newDevice.Name)
-                                        {
-                                            // If the IP address has changed
-                                            if (device.IpAddress != newDevice.IpAddress)
-                                            {
-                                                // Update the smart device in the database
-                                                device.IpAddress = newDevice.IpAddress;
-
-                                                return;
-                                            }
-                                            else // If its a perfect match
-                                            {
-                                                // Ignore the response
-                                                return;
-                                            }
-                                        }
-                                    }
-
                                     // Add it to the database
                                     if (debug)
                                         Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
+
                                     await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                                     {
+                                        // Go through the existing devices
+                                        foreach (var device in Devices)
+                                        {
+                                            if (device.Name == newDevice.Name)
+                                            {
+                                                // If the IP address has changed
+                                                if (device.IpAddress != newDevice.IpAddress)
+                                                {
+                                                    // Update the smart device in the database
+                                                    device.IpAddress = newDevice.IpAddress;
+
+                                                    return;
+                                                }
+                                                else // If its a perfect match
+                                                {
+                                                    // Ignore the response
+                                                    return;
+                                                }
+                                            }
+                                        }
                                         Devices.Add(newDevice);
                                         whenDeviceAdded.OnNext(newDevice);
                                     });

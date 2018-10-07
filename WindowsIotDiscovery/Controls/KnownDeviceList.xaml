@@ -13,6 +13,7 @@
 
     <UserControl.Resources>
         <converters:AnyToVisibility x:Key="AnyToVisibility"/>
+        <converters:NoneToVisibility x:Key="NoneToVisibility"/>
     </UserControl.Resources>
     
     <RelativePanel
@@ -45,7 +46,7 @@
             Padding="0,0,0,32"
             RelativePanel.AlignHorizontalCenterWithPanel="True"
             RelativePanel.AlignVerticalCenterWithPanel="True"
-            Visibility="{x:Bind DiscoveryClient.Devices, Mode=OneWay, Converter={StaticResource AnyToVisibility}}">
+            Visibility="{x:Bind DiscoveryClient.Devices, Mode=OneWay, Converter={StaticResource NoneToVisibility}}">
             <TextBlock
                 x:Name="TbEmpty"
                 FontWeight="Light"
@@ -69,7 +70,8 @@
             FontFamily="Segoe MDL2 Assets"
             Glyph="&#xE72C;"
             RelativePanel.AlignRightWithPanel="True"
-            RelativePanel.AlignTopWithPanel="True"/>
+            RelativePanel.AlignTopWithPanel="True"
+            Visibility="Collapsed"/>
         <RelativePanel
             x:Name="RpLoading"
             IsHitTestVisible="False"
