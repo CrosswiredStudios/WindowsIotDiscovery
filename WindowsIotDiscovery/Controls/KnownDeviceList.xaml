@@ -6,10 +6,15 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:WindowsIotDiscovery.Models"
+    xmlns:converters="using:WindowsIotDiscovery.Converters"
     mc:Ignorable="d"
     d:DesignHeight="300"
     d:DesignWidth="400">
 
+    <UserControl.Resources>
+        <converters:AnyToVisibility x:Key="AnyToVisibility"/>
+    </UserControl.Resources>
+    
     <RelativePanel
         x:Name="RpContainer"
         HorizontalAlignment="Stretch">
@@ -35,11 +40,49 @@
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
+        <RelativePanel
+            x:Name="RpEmpty"
+            Padding="0,0,0,32"
+            RelativePanel.AlignHorizontalCenterWithPanel="True"
+            RelativePanel.AlignVerticalCenterWithPanel="True"
+            Visibility="{x:Bind DiscoveryClient.Devices, Mode=OneWay, Converter={StaticResource AnyToVisibility}}">
+            <TextBlock
+                x:Name="TbEmpty"
+                FontWeight="Light"
+                FontStyle="Italic"
+                Padding="8"
+                RelativePanel.AlignHorizontalCenterWithPanel="True"         
+                Text="No devices were found."/>
+            <TextBlock
+                x:Name="TbRefresh"
+                Foreground="Blue"
+                Height="32"
+                Padding="0,6,0,0"
+                RelativePanel.AlignHorizontalCenterWithPanel="True"
+                RelativePanel.Below="TbEmpty"
+                Text="Refresh"
+                TextAlignment="Center"
+                Width="96"/>
+        </RelativePanel>
         <FontIcon
             x:Name="FiRefresh"
             FontFamily="Segoe MDL2 Assets"
             Glyph="&#xE72C;"
             RelativePanel.AlignRightWithPanel="True"
             RelativePanel.AlignTopWithPanel="True"/>
+        <RelativePanel
+            x:Name="RpLoading"
+            IsHitTestVisible="False"
+            RelativePanel.AlignBottomWithPanel="True"
+            RelativePanel.AlignLeftWithPanel="True"
+            RelativePanel.AlignRightWithPanel="True"
+            RelativePanel.AlignTopWithPanel="True">
+            <ProgressRing
+                x:Name="PrLoading"
+                Height="128"
+                RelativePanel.AlignHorizontalCenterWithPanel="True"
+                RelativePanel.AlignVerticalCenterWithPanel="True"
+                Width="128"/>
+        </RelativePanel>
     </RelativePanel>
 </UserControl>

@@ -14,10 +14,12 @@ using System.Linq;
 using System.Net.Http;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.Core;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
+using Windows.UI.Core;
 using WindowsIotDiscovery.Models.Messages;
 
 namespace WindowsIotDiscovery.Models
@@ -38,6 +40,7 @@ namespace WindowsIotDiscovery.Models
         /// A JSON object that contains all the information about the device
         /// </summary>
         object deviceInfo;
+        ObservableCollection<DiscoverableDevice> devices;
         /// <summary>
         /// The name this device will register under
         /// </summary>
@@ -70,7 +73,14 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// A list of all the devices the Discovery System is aware of
         /// </summary>
-        public ObservableCollection<DiscoverableDevice> Devices { get; set; }
+        public ObservableCollection<DiscoverableDevice> Devices
+        {
+            get => devices;
+            set
+            {
+                devices = value;
+            }
+        }
 
         /// <summary>
         /// The IpAddress of the device
@@ -241,12 +251,17 @@ namespace WindowsIotDiscovery.Models
                 // Setup a UDP socket listener
                 socket.MessageReceived += ReceivedDiscoveryMessage;
                 await socket.BindServiceNameAsync(udpPort.ToString());
+
+                // Tell the world you exist
                 SendDiscoveryResponseMessage();
+
+                // Find out who else is out there
                 Discover();
-                Debug.WriteLine("Discovery System: Success");
 
                 // Set up the rest API
                 InitializeRestApi(tcpPort);
+
+                Debug.WriteLine("Discovery System: Success");
             }
             catch (Exception ex)
             {
@@ -255,6 +270,10 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
+        /// <summary>
+        /// Creates a rest api endpoint for direct TCP communication.
+        /// </summary>
+        /// <param name="tcpPort">The tcp port to listen on.</param>
         async void InitializeRestApi(int tcpPort)
         {
             Debug.WriteLine("Initializing Rest Api");
@@ -278,7 +297,7 @@ namespace WindowsIotDiscovery.Models
             }
 
             Debug.WriteLine($"Initializing Rest Api Completed");
-            Debug.WriteLine($"http://{IpAddress}:{tcpPort}/windowsIotDiscovery");
+            Debug.WriteLine($"http://{IpAddress}:{tcpPort}/discovery");
         }
 
         internal void OnDirectMessage(string message)
@@ -393,8 +412,11 @@ namespace WindowsIotDiscovery.Models
                                     // Add it to the database
                                     if (debug)
                                         Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
-                                    Devices.Add(newDevice);
-                                    whenDeviceAdded.OnNext(newDevice);
+                                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                                    {
+                                        Devices.Add(newDevice);
+                                        whenDeviceAdded.OnNext(newDevice);
+                                    });
                                 }
                                 break;
                             case "update":
@@ -427,8 +449,13 @@ namespace WindowsIotDiscovery.Models
                                     // If no matches were found, add this device
                                     if (debug)
                                         Debug.WriteLine($"Discovery System: Added {newDevice.Name} @ {newDevice.IpAddress}");
-                                    Devices.Add(newDevice);
-                                    whenDeviceAdded.OnNext(newDevice);
+
+                                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                                    {
+                                        Devices.Add(newDevice);
+                                        whenDeviceAdded.OnNext(newDevice);
+                                    });
+                                    
                                 }
                                 break;
                         };
@@ -473,7 +500,7 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
-        public async void SendDirectMessage(string deviceName, string message)
+        public async Task<bool> SendDirectMessage(string deviceName, string message)
         {
             try
             {
@@ -482,11 +509,13 @@ namespace WindowsIotDiscovery.Models
                 {
                     var uri = $"http://{device.IpAddress}:{tcpPort}/discovery/directMessage/{message}";
                     var response = await httpClient.GetAsync(uri);
+                    return response.IsSuccessStatusCode;
                 };
             }
             catch(Exception ex)
             {
                 Debug.WriteLine(ex);
+                return false;
             }
         }
 
