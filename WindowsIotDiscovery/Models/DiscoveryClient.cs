@@ -82,6 +82,8 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
+        public bool HasErrors { get; set; }
+
         /// <summary>
         /// The IpAddress of the device
         /// </summary>
