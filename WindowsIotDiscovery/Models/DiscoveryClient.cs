@@ -24,8 +24,12 @@ using WindowsIotDiscovery.Models.Messages;
 
 namespace WindowsIotDiscovery.Models
 {
+    public delegate void OnStateRequestedEvent();
+
     public class DiscoveryClient : INotifyPropertyChanged
     {
+        public event OnStateRequestedEvent OnStateRequested;
+
         const bool debug = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -36,10 +40,6 @@ namespace WindowsIotDiscovery.Models
         /// Flag to indicate if the system is broadcasting discovery responses
         /// </summary>
         bool broadcasting;
-        /// <summary>
-        /// A JSON object that contains all the information about the device
-        /// </summary>
-        object deviceInfo;
         ObservableCollection<DiscoverableDevice> devices;
         /// <summary>
         /// The name this device will register under
@@ -64,11 +64,7 @@ namespace WindowsIotDiscovery.Models
         /// <summary>
         /// Holds the current state of the device
         /// </summary>
-        public object DeviceInfo
-        {
-            get => deviceInfo;
-            set { deviceInfo = value; }
-        }
+        public object DeviceInfo { get; set; }
 
         /// <summary>
         /// A list of all the devices the Discovery System is aware of
@@ -145,7 +141,7 @@ namespace WindowsIotDiscovery.Models
         public async void BroadcastUpdate(JObject currentDeviceInfo = null)
         {
             // Update device info with passed in information
-            if (currentDeviceInfo != null) deviceInfo = currentDeviceInfo;
+            if (currentDeviceInfo != null) DeviceInfo = currentDeviceInfo;
 
             // Get an output stream to all IPs on the given port
             using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort.ToString()))
@@ -154,7 +150,7 @@ namespace WindowsIotDiscovery.Models
                 using (var writer = new DataWriter(stream))
                 {
                     // Create a discovery update message
-                    var discoveryUpdate = new DiscoveryUpdateMessage(name, JObject.FromObject(deviceInfo));
+                    var discoveryUpdate = new DiscoveryUpdateMessage(name, JObject.FromObject(DeviceInfo));
 
                     // Convert to a JSON string
                     var discoveryUpdateString = JsonConvert.SerializeObject(discoveryUpdate);
@@ -248,7 +244,7 @@ namespace WindowsIotDiscovery.Models
                 this.name = name;
 
                 // Set initial variables
-                this.deviceInfo = deviceInfo;
+                DeviceInfo = deviceInfo;
 
                 // Setup a UDP socket listener
                 socket.MessageReceived += ReceivedDiscoveryMessage;
@@ -532,7 +528,7 @@ namespace WindowsIotDiscovery.Models
                     using (var writer = new DataWriter(stream))
                     {
                         // Create a discovery response message
-                        var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(deviceInfo), "");
+                        var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(DeviceInfo), "");
 
                         var discoveryResponseString = JsonConvert.SerializeObject(discoveryResponse);
 
@@ -618,7 +614,7 @@ namespace WindowsIotDiscovery.Models
             {
                 return new GetResponse(
                   GetResponse.ResponseStatus.OK,
-                  "");
+                  discoveryClient.DeviceInfo);
             }
             catch (Exception ex)
             {
