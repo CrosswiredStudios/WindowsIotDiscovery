@@ -1,3 +1,5 @@
+# WARNING: This project is changing its structure to allow for more use cases. I wanted to use this class in a Xamarin project so I have extracted common code to its own project and am making implementations for all .net flavors
+
 # WindowsIotDiscovery
 ### A simple discovery and communication system for IoT devices on a network.
 
