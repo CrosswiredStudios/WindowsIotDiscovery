@@ -25,20 +25,55 @@ using WindowsIotDiscovery.Common.Models.Messages;
 
 namespace WindowsIotDiscovery.Models
 {
+    public delegate void OnStateRequestedEvent();
+
     public class DiscoveryClient : Common.Models.DiscoveryClient, INotifyPropertyChanged
     {
         
+
+
+
+        public event OnStateRequestedEvent OnStateRequested;
+
+        const bool debug = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         #region Properties
 
+       
+        /// Flag to indicate if the system is broadcasting discovery responses
+        /// </summary>
+        bool broadcasting;
+        ObservableCollection<DiscoverableDevice> devices;
+        /// <summary>
+        /// The name this device will register under
+        /// </summary>
+        string name;
         /// <summary>
         /// UDP Socket object
         /// </summary>
-        protected DatagramSocket socket;
+        DatagramSocket socket;
+        int tcpPort;
+        /// <summary>
+        /// Port to send and receive UDP messages on
+        /// </summary>
+        int udpPort;
+
+        readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
+        readonly Subject<string> whenDirectMessage = new Subject<string>();
+        readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
+        readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
+        readonly Subject<JObject> whenUpdateReceived = new Subject<JObject>();
+
+        /// <summary>
+        /// Holds the current state of the device
+        /// </summary>
+        public object DeviceInfo { get; set; }
 
         
+
+        public bool HasErrors { get; set; }
 
         /// <summary>
         /// The IpAddress of the device
@@ -87,7 +122,7 @@ namespace WindowsIotDiscovery.Models
         public async void BroadcastUpdate(JObject currentDeviceInfo = null)
         {
             // Update device info with passed in information
-            if (currentDeviceInfo != null) deviceInfo = currentDeviceInfo;
+            if (currentDeviceInfo != null) DeviceInfo = currentDeviceInfo;
 
             // Get an output stream to all IPs on the given port
             using (var stream = await socket.GetOutputStreamAsync(new HostName("255.255.255.255"), udpPort.ToString()))
@@ -96,7 +131,7 @@ namespace WindowsIotDiscovery.Models
                 using (var writer = new DataWriter(stream))
                 {
                     // Create a discovery update message
-                    var discoveryUpdate = new DiscoveryUpdateMessage(name, JObject.FromObject(deviceInfo));
+                    var discoveryUpdate = new DiscoveryUpdateMessage(name, JObject.FromObject(DeviceInfo));
 
                     // Convert to a JSON string
                     var discoveryUpdateString = JsonConvert.SerializeObject(discoveryUpdate);
@@ -172,7 +207,7 @@ namespace WindowsIotDiscovery.Models
                 this.name = name;
 
                 // Set initial variables
-                this.deviceInfo = deviceInfo;
+                DeviceInfo = deviceInfo;
 
                 // Setup a UDP socket listener
                 socket.MessageReceived += ReceivedDiscoveryMessage;
@@ -456,7 +491,7 @@ namespace WindowsIotDiscovery.Models
                     using (var writer = new DataWriter(stream))
                     {
                         // Create a discovery response message
-                        var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(deviceInfo), "");
+                        var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(DeviceInfo), "");
 
                         var discoveryResponseString = JsonConvert.SerializeObject(discoveryResponse);
 
@@ -542,7 +577,7 @@ namespace WindowsIotDiscovery.Models
             {
                 return new GetResponse(
                   GetResponse.ResponseStatus.OK,
-                  "");
+                  discoveryClient.DeviceInfo);
             }
             catch (Exception ex)
             {

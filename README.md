@@ -11,10 +11,10 @@ This library is intended for use with any Universal Windows Platform (UWP) app t
 
 The DiscoveryClient can be added to any app with just two lines:
 
-    var discoveryClient = new DiscoveryClient("1234");
-    discoveryClient.Initialize("My Unique Name");
+    var discoveryClient = new DiscoveryClient("1234", "4567");
+    discoveryClient.Initialize("My Unique Name", serializableStateObject);
 
-The first line will create an instance of the client with the port to operate on. The second line sets the unique name of this device. Upon initiation, the device will send out an IDENTIFY packet and a DISCOVER packet to find all the other devices on the network.
+The first line will create an instance of the client with the desired TCP and UDP ports to operate on. The second line sets the unique name of this device and a pointer to an object that holds all state information for the device. It is recommended that you use a JObject. Upon initiation, the device will send out an IDENTIFY packet and a DISCOVER packet to find all the other devices on the network.
 
 ### Devices
 
@@ -22,7 +22,7 @@ Once the client is initialized, you can access devices by their name using LINQ:
 
     var iotDevice = discoveryClient.Devices.FirstOrDefault(device => device.Name == "iotDeviceName");
     
-Once you have an object, you have access to the Name, IpAdress, and DeviceInfo - a JObject that has any information the device provided. 
+Once you have an object, you have access to the Name, IpAdress, and DeviceInfo - a object that has any information the device provided. 
     
     string iotDeviceIpAddress = iotDevice.IpAddress;
     string iotDeviceName = iotDevice.Name;
@@ -39,7 +39,7 @@ Since the client identifies on start up and attempts to discover other devices, 
         discoveryClient.Discover();
     }, null, 0, 30000);
 
-*Calling Discover() broadcasts a UDP message with a list of known devices. Each device will look at the list and respond if they are not present or if their IP address has changed.*
+*Calling Discover() broadcasts a UDP message with a list of known devices. Each device will look at the list and respond if they are not present or if their IP address has changed. This also means that device names must be unique.*
 
 ### Events
 
@@ -47,7 +47,10 @@ Sometimes you will want to know when a device is added or when a device's state 
 
 **WhenDeviceAdded**
 
-    discoveryClient
+    using System.Reactive.Linq;
+    using System.Threading;
+    
+    var whenDeviceAdded = discoveryClient
       .WhenDeviceAdded
       .ObserveOn(SynchronizationContext.Current)
       .Subscribe(device =>
@@ -57,7 +60,10 @@ Sometimes you will want to know when a device is added or when a device's state 
 
 **WhenDeviceUpdated**
 
-    discoveryClient
+    using System.Reactive.Linq;
+    using System.Threading;
+    
+    var whenDeviceUpdated = discoveryClient
       .WhenDeviceUpdated
       .ObserveOn(SynchronizationContext.Current)
       .Subscribe(device =>
@@ -68,7 +74,31 @@ Sometimes you will want to know when a device is added or when a device's state 
 *ObserveOn(SynchronizationContext.Current) is used to ensure that the code runs on the UI thread.*
 *Dont forget to dispose of subscriptions when you're done ;)*
 
-### Upcoming Changes
+### Direct Messaging (TCP)
 
-Make discovery more efficient.
-Add direct messaging over udp.
+Once a device is discovered, it is possible to send messages directly to that device. This is done utilizing TCP to ensure that the message is delivered. Each device runs a lightweight rest api that listens for incoming messages. A message can be as simple as a character but it is more useful to send a serialized object.
+
+**SendDirectMessage**
+    
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
+
+    var jMessage = new JObject();
+    jMessage.Add("powerLevel", 100);
+    
+    var success = await discoveryClient.SendDirectMessage("myDevice", jMessage.ToString());
+    
+**WhenDirectMessage**
+
+    using System.Reactive.Linq;
+    using System.Threading;
+    
+    var whenDirectMessage = discoveryClient
+        .WhenDirectMessage
+        .ObserveOn(SynchronizationContext.Current)
+        .Subscribe(message => {
+            var jMessage = JObject.Parse(message);
+            var powerLevel = message.GetValue<int>("powerLevel");
+        });
+
+
