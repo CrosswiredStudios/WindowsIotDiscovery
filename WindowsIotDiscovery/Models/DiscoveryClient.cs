@@ -37,41 +37,12 @@ namespace WindowsIotDiscovery.Models
 
         const bool debug = true;
 
+        DatagramSocket socket;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         #region Properties
 
-       
-        /// Flag to indicate if the system is broadcasting discovery responses
-        /// </summary>
-        bool broadcasting;
-        ObservableCollection<DiscoverableDevice> devices;
-        /// <summary>
-        /// The name this device will register under
-        /// </summary>
-        string name;
-        /// <summary>
-        /// UDP Socket object
-        /// </summary>
-        DatagramSocket socket;
-        int tcpPort;
-        /// <summary>
-        /// Port to send and receive UDP messages on
-        /// </summary>
-        int udpPort;
-
-        readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
-        readonly Subject<string> whenDirectMessage = new Subject<string>();
-        readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
-        readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
-        readonly Subject<JObject> whenUpdateReceived = new Subject<JObject>();
-
-        /// <summary>
-        /// Holds the current state of the device
-        /// </summary>
-        public object DeviceInfo { get; set; }
-
-        
 
         public bool HasErrors { get; set; }
 
