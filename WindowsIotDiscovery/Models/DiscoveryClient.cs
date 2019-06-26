@@ -20,72 +20,30 @@ using Windows.Networking.Connectivity;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 using Windows.UI.Core;
-using WindowsIotDiscovery.Models.Messages;
+using WindowsIotDiscovery.Common.Models;
+using WindowsIotDiscovery.Common.Models.Messages;
 
 namespace WindowsIotDiscovery.Models
 {
-    public class DiscoveryClient : INotifyPropertyChanged
+    public class DiscoveryClient : Common.Models.DiscoveryClient, INotifyPropertyChanged
     {
-        const bool debug = true;
+        
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         #region Properties
 
         /// <summary>
-        /// Flag to indicate if the system is broadcasting discovery responses
-        /// </summary>
-        bool broadcasting;
-        /// <summary>
-        /// A JSON object that contains all the information about the device
-        /// </summary>
-        object deviceInfo;
-        ObservableCollection<DiscoverableDevice> devices;
-        /// <summary>
-        /// The name this device will register under
-        /// </summary>
-        string name;
-        /// <summary>
         /// UDP Socket object
         /// </summary>
-        DatagramSocket socket;
-        int tcpPort;
-        /// <summary>
-        /// Port to send and receive UDP messages on
-        /// </summary>
-        int udpPort;
+        protected DatagramSocket socket;
 
-        readonly Subject<JObject> whenDataReceived = new Subject<JObject>();
-        readonly Subject<string> whenDirectMessage = new Subject<string>();
-        readonly Subject<DiscoverableDevice> whenDeviceAdded = new Subject<DiscoverableDevice>();
-        readonly Subject<DiscoverableDevice> whenDeviceUpdated = new Subject<DiscoverableDevice>();
-        readonly Subject<JObject> whenUpdateReceived = new Subject<JObject>();
-
-        /// <summary>
-        /// Holds the current state of the device
-        /// </summary>
-        public object DeviceInfo
-        {
-            get => deviceInfo;
-            set { deviceInfo = value; }
-        }
-
-        /// <summary>
-        /// A list of all the devices the Discovery System is aware of
-        /// </summary>
-        public ObservableCollection<DiscoverableDevice> Devices
-        {
-            get => devices;
-            set
-            {
-                devices = value;
-            }
-        }
+        
 
         /// <summary>
         /// The IpAddress of the device
         /// </summary>
-        public string IpAddress
+        public override string IpAddress
         {
             get
             {
@@ -101,23 +59,9 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
-        /// <summary>
-        /// Is the Discovery System broadcasting discovery response messages
-        /// </summary>
-        public bool IsBroadcasting => broadcasting;
+        
 
-        public string Name => name;
-
-        /// <summary>
-        /// Port the Discovery System will send and receive messages on
-        /// </summary>
-        public string Port => udpPort.ToString();
-
-        public IObservable<DiscoverableDevice> WhenDeviceAdded => whenDeviceAdded;
-        public IObservable<JObject> WhenDataReceived => whenDataReceived;
-        public IObservable<DiscoverableDevice> WhenDeviceUpdated => whenDeviceUpdated;
-        public IObservable<string> WhenDirectMessage => whenDirectMessage;
-        public IObservable<JObject> WhenUpdateReceived => whenUpdateReceived;
+        
 
         #endregion
 
@@ -169,7 +113,7 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
-        public async void Discover()
+        public override async void Discover()
         {
             if (debug)
                 Debug.WriteLine("Discovery System: Sending Discovery Request");
@@ -211,32 +155,14 @@ namespace WindowsIotDiscovery.Models
             }
         }
 
-        public async Task<TResult> GetDeviceState<TResult>(DiscoverableDevice device)
-        {
-            using (var httpClient = new HttpClient())
-            {
-                var uri = new Uri($"http://{device.IpAddress}:{tcpPort}/windowsIotDiscovery/state");
-                var response = await httpClient.GetAsync(uri);
-                var responseStream = await response.Content.ReadAsStreamAsync();
-
-                using (var reader = new StreamReader(responseStream))
-                {
-                    using (var jsonReader = new JsonTextReader(reader))
-                    {
-                        return new JsonSerializer().Deserialize<TResult>(jsonReader);
-                    }
-                }
-                
-            }
-            
-        }
+        
 
         /// <summary>
         /// Initiates the Discovery System Client. 
         /// </summary>
-        /// <param name="udpPort">This is the port the system will listen for and broadcast udp packets</param>
+        /// <param name="name">This is the port the system will listen for and broadcast udp packets</param>
         /// <param name="deviceInfo">A JSON object containing all the relevant device info</param>
-        public async void Initialize(string name, object deviceInfo)
+        public override async void Initialize(string name, object deviceInfo)
         {
             Debug.WriteLine($"Discovery System: Initializing {name}");
 

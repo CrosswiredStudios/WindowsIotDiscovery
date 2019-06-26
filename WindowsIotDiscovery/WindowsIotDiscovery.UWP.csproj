@@ -11,8 +11,8 @@
     <AssemblyName>WindowsIotDiscovery</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
-    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.17134.0</TargetPlatformVersion>
-    <TargetPlatformMinVersion>10.0.17134.0</TargetPlatformMinVersion>
+    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.17763.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -111,24 +111,22 @@
     <Compile Include="Controls\KnownDeviceList.xaml.cs">
       <DependentUpon>KnownDeviceList.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Models\DiscoverableDevice.cs" />
     <Compile Include="Models\DiscoveryClient.cs" />
-    <Compile Include="Models\Messages\DiscoveryDataMessage.cs" />
-    <Compile Include="Models\Messages\DiscoveryUpdateMessage.cs" />
-    <Compile Include="Models\Messages\DiscoveryRequestMessage.cs" />
-    <Compile Include="Models\Messages\DiscoveryResponseMessage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\WindowsIotDiscovery.rd.xml" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="EmbedIO">
+      <Version>2.9.1</Version>
+    </PackageReference>
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
-      <Version>6.1.7</Version>
+      <Version>6.2.8</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Toolkit.Uwp.UI.Animations">
-      <Version>4.0.0</Version>
+      <Version>5.1.1</Version>
     </PackageReference>
     <PackageReference Include="Newtonsoft.Json">
-      <Version>11.0.2</Version>
+      <Version>12.0.2</Version>
     </PackageReference>
     <PackageReference Include="Restup">
       <Version>1.0.0</Version>
@@ -142,6 +140,12 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClassLibrary1\WindowsIotDiscovery.Common.csproj">
+      <Project>{998d80eb-767b-41e1-a14c-de5ed4066479}</Project>
+      <Name>WindowsIotDiscovery.Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

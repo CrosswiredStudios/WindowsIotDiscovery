@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace WindowsIotDiscovery.Models
+namespace WindowsIotDiscovery.Common.Models
 {
     public class DiscoverableDevice
     {

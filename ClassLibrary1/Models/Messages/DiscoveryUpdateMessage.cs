@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace WindowsIotDiscovery.Models.Messages
+namespace WindowsIotDiscovery.Common.Models.Messages
 {
     /// <summary>
     /// A message template for informing the Discovery System Client that we have received their information

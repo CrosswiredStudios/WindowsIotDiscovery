@@ -2,10 +2,11 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
+using System.Runtime.Serialization;
 
-namespace WindowsIotDiscovery.Models.Messages
+namespace WindowsIotDiscovery.Common.Models.Messages
 {
-
+    [DataContract]
     public sealed class DiscoveryResponseMessage
     {    
 
@@ -16,12 +17,14 @@ namespace WindowsIotDiscovery.Models.Messages
         /// <summary>
         /// Discovery Response Command
         /// </summary>
+        [DataMember]
         [JsonProperty(PropertyName = "command")]
         public string Command => "IDENTIFY";
 
         /// <summary>
         /// Discovery Request Command
         /// </summary>
+        [DataMember]
         [JsonProperty(PropertyName = "deviceInfo")]
         public JObject DeviceInfo
         {
@@ -31,6 +34,7 @@ namespace WindowsIotDiscovery.Models.Messages
         /// <summary>
         /// Discovery Request Command
         /// </summary>
+        [DataMember]
         [JsonProperty(PropertyName = "name")]
         public string Name
         {
@@ -40,6 +44,7 @@ namespace WindowsIotDiscovery.Models.Messages
         /// <summary>
         /// Discovery Request Command
         /// </summary>
+        [DataMember]
         [JsonProperty(PropertyName = "silenceUrl")]
         public string SilenceUrl
         {

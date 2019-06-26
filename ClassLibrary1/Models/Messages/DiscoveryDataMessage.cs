@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace WindowsIotDiscovery.Models.Messages
+namespace WindowsIotDiscovery.Common.Models.Messages
 {
     public class DiscoveryDataMessage
     {

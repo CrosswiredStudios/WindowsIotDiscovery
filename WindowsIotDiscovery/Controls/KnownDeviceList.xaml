@@ -5,7 +5,7 @@
     xmlns:local="using:WindowsIotDiscovery.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:models="using:WindowsIotDiscovery.Models"
+    xmlns:models="using:WindowsIotDiscovery.Common.Models"
     xmlns:converters="using:WindowsIotDiscovery.Converters"
     mc:Ignorable="d"
     d:DesignHeight="300"
