@@ -21,7 +21,7 @@ namespace WindowsIotDiscovery.NET
             broadcasting = false;
             Devices = new ObservableCollection<DiscoverableDevice>();
             name = string.Empty;
-            socket = new UdpClient();
+            
             this.tcpPort = tcpPort;
             this.udpPort = udpPort;
         }
@@ -80,9 +80,8 @@ namespace WindowsIotDiscovery.NET
                 this.deviceInfo = deviceInfo;
 
                 // Setup a UDP socket listener
-                socket.Connect("255.255.255.255", udpPort);
-
-                ListenForUdp();
+                socket = new UdpClient(udpPort);
+                socket.BeginReceive(new AsyncCallback(OnUdpPacketReceived), null);
 
                 // Tell the world you exist
                 SendDiscoveryResponseMessage();
@@ -102,28 +101,21 @@ namespace WindowsIotDiscovery.NET
             }
         }
 
-        public Task ListenForUdp()
+        void OnUdpPacketReceived(IAsyncResult result)
         {
-            return Task.Run(() =>
+            
+            try
             {
-                try
-                {
-                    //IPEndPoint object will allow us to read datagrams sent from any source.
-                    IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
-
-                    while (true)
-                    {
-                        Byte[] receiveBytes = socket.Receive(ref RemoteIpEndPoint);
-                        string returnData = Encoding.ASCII.GetString(receiveBytes);
-                        Debug.WriteLine($"Received udp packet: {returnData}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("Unable to listen for UDP packets");
-                    Debug.WriteLine("Reason: " + ex.Message);
-                }
-            });
+                IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 8000);
+                byte[] receiveBytes = socket.EndReceive(result, ref RemoteIpEndPoint);
+                string returnData = Encoding.ASCII.GetString(receiveBytes);
+                Debug.WriteLine($"Received udp packet: {returnData}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Unable to listen for UDP packets");
+                Debug.WriteLine("Reason: " + ex.Message);
+            }
         }
 
         void SendDiscoveryResponseMessage()
@@ -134,7 +126,7 @@ namespace WindowsIotDiscovery.NET
                 var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(deviceInfo), "");
                 var serializedResponse = JsonConvert.SerializeObject(discoveryResponse);
                 var bytes = Encoding.ASCII.GetBytes(serializedResponse);
-                socket.Send(bytes, bytes.Length);
+                socket.Send(bytes, bytes.Length, new IPEndPoint(IPAddress.Broadcast, udpPort));
             }
             catch (Exception ex)
             {
