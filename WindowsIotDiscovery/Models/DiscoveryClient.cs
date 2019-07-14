@@ -430,24 +430,32 @@ namespace WindowsIotDiscovery.Models
             {
                 Debug.WriteLine($"DiscoveryClient: Could not send data message.");
             }
-        }
+        }        
 
-        public async Task<bool> SendDirectMessage(string deviceName, string message)
+        /// <summary>
+        /// Sends a direct message to another device that has already been discovered.
+        /// </summary>
+        /// <typeparam name="T">The type to cast the response to.</typeparam>
+        /// <param name="device">The device to send the message to.</param>
+        /// <param name="message">The message to send. Make sure to override the objects ToString method.</param>
+        /// <returns></returns>
+        public async Task<T> SendDirectMessage<T>(DiscoverableDevice device, object message)
         {
             try
             {
-                var device = Devices.FirstOrDefault(d => d.Name == deviceName);
                 using (var httpClient = new HttpClient())
                 {
                     var uri = $"http://{device.IpAddress}:{tcpPort}/discovery/directMessage/{message}";
                     var response = await httpClient.GetAsync(uri);
-                    return response.IsSuccessStatusCode;
+                    response.EnsureSuccessStatusCode();
+                    string content = await response.Content.ReadAsStringAsync();
+                    return JsonConvert.DeserializeObject<T>(content);
                 };
             }
             catch(Exception ex)
             {
                 Debug.WriteLine(ex);
-                return false;
+                return default(T);
             }
         }
 
