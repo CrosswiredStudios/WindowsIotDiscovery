@@ -445,7 +445,7 @@ namespace WindowsIotDiscovery.Models
             {
                 using (var httpClient = new HttpClient())
                 {
-                    var uri = $"http://{device.IpAddress}:{tcpPort}/discovery/directMessage/{message}";
+                    var uri = $"http://{device.IpAddress}:{tcpPort}/discovery/directMessage/{message.ToString()}";
                     var response = await httpClient.GetAsync(uri);
                     response.EnsureSuccessStatusCode();
                     string content = await response.Content.ReadAsStringAsync();
