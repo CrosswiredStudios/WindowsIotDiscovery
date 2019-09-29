@@ -12,7 +12,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.Networking;
@@ -27,12 +26,8 @@ namespace WindowsIotDiscovery.Models
 {
     public delegate void OnStateRequestedEvent();
 
-    public class DiscoveryClient : Common.Models.DiscoveryClient, INotifyPropertyChanged
+    public class DiscoveryClient : DiscoveryClientBase, INotifyPropertyChanged
     {
-        
-
-
-
         public event OnStateRequestedEvent OnStateRequested;
 
         const bool debug = true;
@@ -439,7 +434,7 @@ namespace WindowsIotDiscovery.Models
         /// <param name="device">The device to send the message to.</param>
         /// <param name="message">The message to send. Make sure to override the objects ToString method.</param>
         /// <returns></returns>
-        public async Task<T> SendDirectMessage<T>(DiscoverableDevice device, object message)
+        public override async Task<T> SendDirectMessage<T>(DiscoverableDevice device, object message)
         {
             try
             {

@@ -26,9 +26,18 @@ namespace WindowsIotDiscovery.Common.Models
         /// <param name="name">This is the port the system will listen for and broadcast udp packets</param>
         /// <param name="deviceInfo">A JSON object containing all the relevant device info</param>
         void Initialize(string name, object deviceInfo);
+
+        /// <summary>
+        /// Sends a message to another device over TCP.
+        /// </summary>
+        /// <typeparam name="T">The type of response expected.</typeparam>
+        /// <param name="device">The device to send the message to.</param>
+        /// <param name="message">The message to send. Classes will be serialized into JSON objects.</param>
+        /// <returns></returns>
+        Task<T> SendDirectMessage<T>(DiscoverableDevice device, object message);
     }
 
-    public abstract class DiscoveryClient : IDiscoveryClient
+    public abstract class DiscoveryClientBase : IDiscoveryClient
     {
         /// <summary>
         /// Flag to indicate if the system is broadcasting discovery responses
@@ -128,11 +137,21 @@ namespace WindowsIotDiscovery.Common.Models
         }
 
         public abstract void Discover();
+
         /// <summary>
         /// Initiates the Discovery System Client. 
         /// </summary>
         /// <param name="name">This is the port the system will listen for and broadcast udp packets</param>
         /// <param name="deviceInfo">A JSON object containing all the relevant device info</param>
         public abstract void Initialize(string name, object deviceInfo);
+
+        /// <summary>
+        /// Sends a message to another device over TCP.
+        /// </summary>
+        /// <typeparam name="T">The type of response expected.</typeparam>
+        /// <param name="device">The device to send the message to.</param>
+        /// <param name="message">The message to send. Classes will be serialized into JSON objects.</param>
+        /// <returns></returns>
+        public abstract Task<T> SendDirectMessage<T>(DiscoverableDevice device, object message);
     }
 }

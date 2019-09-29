@@ -4,6 +4,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ using WindowsIotDiscovery.Common.Models.Messages;
 
 namespace WindowsIotDiscovery.NET
 {
-    public class DiscoveryClient : Common.Models.DiscoveryClient
+    public class DiscoveryClient : DiscoveryClientBase
     {
         UdpClient socket;
 
@@ -115,6 +116,33 @@ namespace WindowsIotDiscovery.NET
             {
                 Debug.WriteLine("Unable to listen for UDP packets");
                 Debug.WriteLine("Reason: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Sends a direct message to another device that has already been discovered.
+        /// </summary>
+        /// <typeparam name="T">The type to cast the response to.</typeparam>
+        /// <param name="device">The device to send the message to.</param>
+        /// <param name="message">The message to send. Make sure to override the objects ToString method.</param>
+        /// <returns></returns>
+        public override async Task<T> SendDirectMessage<T>(DiscoverableDevice device, object message)
+        {
+            try
+            {
+                using (var httpClient = new HttpClient())
+                {
+                    var uri = $"http://{device.IpAddress}:{tcpPort}/discovery/directMessage/{message.ToString()}";
+                    var response = await httpClient.GetAsync(uri);
+                    response.EnsureSuccessStatusCode();
+                    string content = await response.Content.ReadAsStringAsync();
+                    return JsonConvert.DeserializeObject<T>(content);
+                };
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                return default(T);
             }
         }
 
