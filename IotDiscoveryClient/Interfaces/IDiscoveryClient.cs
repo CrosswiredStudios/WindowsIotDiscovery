@@ -5,8 +5,12 @@ using IotDiscoveryClient.Models;
 
 namespace IotDiscoveryClient.Interfaces
 {
+    public delegate void OnDirectMessageEvent(string message);
+
     public interface IDiscoveryClient
     {
+        event OnDirectMessageEvent OnDirectMessage;
+
         object DeviceInfo { get; set; }
         ObservableCollection<DiscoverableDevice> Devices { get; }
         string IpAddress { get; }

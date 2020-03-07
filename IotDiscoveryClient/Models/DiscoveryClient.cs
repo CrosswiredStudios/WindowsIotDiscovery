@@ -18,6 +18,10 @@ namespace IotDiscoveryClient.Models
 {
     public class DiscoveryClient : IDiscoveryClient
     {
+        #region Events
+        public event OnDirectMessageEvent OnDirectMessage;
+        #endregion
+
         #region Fields
         /// <summary>
         /// Flag for creating debug output
@@ -191,7 +195,7 @@ namespace IotDiscoveryClient.Models
                 // First, we will configure our web server by adding Modules.
                 .WithLocalSessionManager()
                 .WithWebApi("/discovery", m => m
-                    .WithController<DiscoveryController>());
+                    .WithController(() => new DiscoveryController(this)));
                 
             }
             catch (Exception ex)
@@ -201,6 +205,15 @@ namespace IotDiscoveryClient.Models
 
             Debug.WriteLine($"Initializing Rest Api Completed");
             Debug.WriteLine($"http://{IpAddress}:{tcpPort}/discovery");
+        }
+
+        /// <summary>
+        /// Triggered by the DiscoveryController when a direct message is received.
+        /// </summary>
+        /// <param name="message">The message that was received.</param>
+        public void WhenDirectMessage(string message)
+        {
+            OnDirectMessage.Invoke(message);
         }
 
         /// <summary>
@@ -258,7 +271,7 @@ namespace IotDiscoveryClient.Models
             try
             {
                 // Create a discovery response message
-                var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(deviceInfo), "");
+                var discoveryResponse = new DiscoveryResponseMessage(name, JObject.FromObject(DeviceInfo), "");
                 var serializedResponse = JsonConvert.SerializeObject(discoveryResponse);
                 var bytes = Encoding.ASCII.GetBytes(serializedResponse);
                 _socket.Send(bytes, bytes.Length, new IPEndPoint(IPAddress.Broadcast, udpPort));
